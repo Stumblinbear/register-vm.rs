@@ -20,7 +20,7 @@ mod tests {
     
             test_vm.registers[0] = $val1;
             test_vm.registers[1] = $val2;
-            test_vm.program = vec![$opcode, 0, 1, 2];
+            test_vm.program = vec![$opcode, 2, 0, 1];
             test_vm.run_once();
     
             assert_eq!(test_vm.registers[2], $result);
@@ -52,7 +52,7 @@ mod tests {
     
             test_vm.float_registers[0] = $val1;
             test_vm.float_registers[1] = $val2;
-            test_vm.program = vec![$opcode, 0, 1, 2];
+            test_vm.program = vec![$opcode, 2, 0, 1];
             test_vm.run_once();
     
             assert_eq!(test_vm.float_registers[2], $result);
@@ -91,10 +91,22 @@ mod tests {
 
 
     #[test]
+    fn set_opcode() {
+        let mut test_vm = get_test_vm();
+
+        test_vm.program = vec![Opcode::Set as u8, 0, 244, 1];
+        test_vm.run_once();
+
+        assert_eq!(test_vm.registers[0], 500);
+    }
+    
+    #[test]
     fn load_opcode() {
         let mut test_vm = get_test_vm();
 
-        test_vm.program = vec![Opcode::Load as u8, 0, 1, 244]; // 500 using two u8s in little endian
+        test_vm.heap = vec![0, 244, 1, 0, 0, 69];
+        test_vm.registers[2] = 1;
+        test_vm.program = vec![Opcode::Load as u8, 0, 2];
         test_vm.run_once();
 
         assert_eq!(test_vm.registers[0], 500);
@@ -127,7 +139,7 @@ mod tests {
 
         test_vm.registers[0] = 9;
         test_vm.registers[1] = 4;
-        test_vm.program = vec![Opcode::Divide.byte(), 0, 1, 2];
+        test_vm.program = vec![Opcode::Divide.byte(), 2, 0, 1];
         test_vm.run_once();
 
         assert_eq!(test_vm.registers[2], 2);
@@ -140,7 +152,10 @@ mod tests {
         let mut test_vm = get_test_vm();
 
         test_vm.registers[0] = 5;
-        test_vm.program = vec![Opcode::ShiftLeft.byte(), 0, 0, Opcode::ShiftLeft.byte(), 0, 1];
+        test_vm.program = vec![Opcode::ShiftLeft.byte(), 0, 16, Opcode::ShiftLeft.byte(), 0, 1];
+        
+        assert_eq!(test_vm.registers[0], 5);
+
         test_vm.run_once();
 
         assert_eq!(test_vm.registers[0], 327680);
@@ -155,7 +170,10 @@ mod tests {
         let mut test_vm = get_test_vm();
 
         test_vm.registers[0] = 655360;
-        test_vm.program = vec![Opcode::ShiftRight.byte(), 0, 1, Opcode::ShiftRight.byte(), 0, 0];
+        test_vm.program = vec![Opcode::ShiftRight.byte(), 0, 1, Opcode::ShiftRight.byte(), 0, 16];
+        
+        assert_eq!(test_vm.registers[0], 655360);
+
         test_vm.run_once();
 
         assert_eq!(test_vm.registers[0], 327680);
@@ -247,45 +265,57 @@ mod tests {
 
 
     #[test]
-    fn f64_load_opcode() {
+    fn set_f64_opcode() {
         let mut test_vm = get_test_vm();
 
-        test_vm.program = vec![Opcode::LoadF64.byte(), 0, 1, 244]; // 500 using two u8s in little endian
+        test_vm.program = vec![Opcode::SetF64 as u8, 0, 244, 1, 0, 0, 0, 0, 0, 0];
+        test_vm.run_once();
+
+        assert_eq!(test_vm.float_registers[0], 500.0);
+    }
+    
+    #[test]
+    fn load_f64_opcode() {
+        let mut test_vm = get_test_vm();
+
+        test_vm.heap = vec![0, 244, 1, 0, 0, 0, 0, 0, 0, 69];
+        test_vm.registers[2] = 1;
+        test_vm.program = vec![Opcode::LoadF64 as u8, 0, 2];
         test_vm.run_once();
 
         assert_eq!(test_vm.float_registers[0], 500.0);
     }
 
     #[test]
-    fn f64_add_opcode() {
+    fn add_f64_opcode() {
         math_f64_op_test!(Opcode::AddF64.byte(),
             1.0, 2.0, 3.0
         );
     }
 
     #[test]
-    fn f64_subtract_opcode() {
+    fn subtract_f64_opcode() {
         math_f64_op_test!(Opcode::SubtractF64.byte(),
             5.0, 1.0, 4.0
         );
     }
 
     #[test]
-    fn f64_multiply_opcode() {
+    fn multiply_f64_opcode() {
         math_f64_op_test!(Opcode::MultiplyF64.byte(),
             5.0, 2.0, 10.0
         );
     }
 
     #[test]
-    fn f64_divide_opcode() {
+    fn divide_f64_opcode() {
         math_f64_op_test!(Opcode::DivideF64.byte(),
             9.0, 4.0, 2.25
         );
     }
 
     #[test]
-    fn f64_equals_opcode() {
+    fn equals_f64_opcode() {
         condition_f64_op_test!(Opcode::EqualF64.byte(),
             10.0, 10.0,
             10.0, 20.0
@@ -293,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn f64_not_equals_opcode() {
+    fn not_equals_f64_opcode() {
         condition_f64_op_test!(Opcode::NotEqualF64.byte(),
             10.0, 20.0,
             10.0, 10.0
@@ -301,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn f64_greater_than_opcode() {
+    fn greater_than_f64_opcode() {
         condition_f64_op_test!(Opcode::GreaterThanF64.byte(),
             10.0, 5.0,
             10.0, 10.0
@@ -309,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn f64_less_than_opcode() {
+    fn less_than_f64_opcode() {
         condition_f64_op_test!(Opcode::LessThanF64.byte(),
             5.0, 10.0,
             10.0, 5.0
@@ -317,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn f64_greater_than_or_equal_opcode() {
+    fn greater_than_or_equal_f64_opcode() {
         condition_f64_op_test!(Opcode::GreaterThanOrEqualF64.byte(),
             10.0, 10.0,
             5.0, 10.0
@@ -325,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn f64_less_than_or_equal_opcode() {
+    fn less_than_or_equal_f64_opcode() {
         condition_f64_op_test!(Opcode::LessThanOrEqualF64.byte(),
             10.0, 10.0,
             10.0, 5.0
@@ -389,7 +419,7 @@ mod tests {
         let mut test_vm = get_test_vm();
 
         test_vm.registers[1] = 1;
-        test_vm.program = vec![Opcode::Move.byte(), 1, 0];
+        test_vm.program = vec![Opcode::Move.byte(), 0, 1];
         test_vm.run_once();
         
         // We should appear on byte seven, as that's where register 1 sends us

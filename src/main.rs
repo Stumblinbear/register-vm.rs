@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use crate::vm::VM;
 use crate::vm::instructions::Opcode;
 
-const COMMAND_PREFIX: char = '!';
+const COMMAND_PREFIX: char = '.';
 
 pub static BANNER: &str = "This is a thing. Type stuff. Yay.";
 pub static PROMPT: &str = ">>> ";
@@ -17,16 +17,25 @@ fn main() {
 
     let mut vm = VM::default();
 
+    let mut show_registers = true;
+
     'main: loop {
-        print!("Registers: ");
+        if show_registers {
+            println!("------------------------------------------------------------------------------------------");
+            print!("Registers: ");
 
-        for register in &vm.registers {
-            print!("{:#04x} ", register);
+            for register in &vm.registers {
+                print!("{:#04x} ", register);
+            }
+
+            println!();
+
+            println!("Remainder: {}          Equality Flag: {}", vm.remainder, vm.equal_flag);
+            
+            println!("------------------------------------------------------------------------------------------");
+
+            show_registers = false;
         }
-
-        println!();
-
-        println!("Remainder: {}          Equality Flag: {}", vm.remainder, vm.equal_flag);
 
         print!("{}", PROMPT);
         
@@ -48,21 +57,34 @@ fn main() {
 
             // Helper variables
             let command = parts[0].to_lowercase();
-            let _args = &parts[1..];
+            let args = &parts[1..];
 
             if command == "quit" {
                 break 'main;
+            } else if command == "registers" {
+                show_registers = true;
+            } else if command == "help" {
+                if args.len() > 0 {
+                    let op = Opcode::from(args[0].to_uppercase());
+                    
+                    println!("{}: {}", op.name(), op.info());
+                } else {
+                    println!("List of all Opcodes:");
+                    for op in Opcode::all() {
+                        println!("  {}: {}", op.instruction(), op.info());
+                    }
+                }
             } else {
                 println!("Unknown command: {}", command);
             }
         } else {
             let tokens: Vec<&str> = input.split_whitespace().collect();
     
-            let op = Opcode::from(tokens[0].to_uppercase()).byte();
+            let op = Opcode::from(tokens[0].to_uppercase());
     
-            print!("{:#04x} ", op);
+            print!("{} ", op.instruction());
             
-            let mut bytes: Vec<u8> = Vec::new();
+            let mut bytes: Vec<u8> = vec![ op.byte() ];
     
             for arg in &tokens[1..] {
                 let result = u8::from_str_radix(&arg, 16);
@@ -79,14 +101,12 @@ fn main() {
                     }
                 }
             }
-    
-            vm.program.append(&mut vec![ op ]);
-    
+
             vm.program.append(&mut bytes);
     
             println!();
     
-            vm.run_once();
+            vm.run();
         }
     }
 }
@@ -100,9 +120,11 @@ mod tests {
 
     #[test]
     pub fn fib() {
-        const TIMES: u16 = 65535;
+        const TIMES: u16 = u16::MAX;
 
         const MAX_ITERATIONS: u8 = 45;
+
+        let mut target = 0;
 
         let mut totals: Vec<u128> = vec![];
         
@@ -117,6 +139,8 @@ mod tests {
                 last = curr;
                 curr = sum;
             }
+
+            target = curr;
             
             totals.push(before.elapsed().as_nanos());
         }
@@ -129,28 +153,28 @@ mod tests {
             let mut test_vm = VM::default();
 
             test_vm.program = vec![
-                Opcode::Load.byte(), 0, 0, 1,   // Load $0 with 1
+                Opcode::Set.byte(), 0, 1, 0,    // Set $0 to 1
                 Opcode::JumpForward.byte(), 0,  // Jump forward $0 bytes
                 Opcode::Halt.byte(),
 
-                Opcode::Load.byte(), 0, 0, 6,   // Load $0 with 6: byte of the halt instruction
+                Opcode::Set.byte(), 0, 6, 0,   // Load $0 with 6: byte of the halt instruction
 
-                Opcode::Load.byte(), 1, 0, 0,   // Load $1 with 0
-                Opcode::Load.byte(), 2, 0, MAX_ITERATIONS - 1,
+                Opcode::Set.byte(), 1, 0, 0,   // Reset $1 to 0
+                Opcode::Set.byte(), 2, MAX_ITERATIONS - 1, 0,
 
-                Opcode::Load.byte(), 3, 0, 0,   // Load $3 with 0
-                Opcode::Load.byte(), 4, 0, 1,   // Load $4 with 1
+                Opcode::Set.byte(), 3, 0, 0,   // Sets $3 to 0
+                Opcode::Set.byte(), 4, 1, 0,   // Sets $4 to 1
                 
-                Opcode::Load.byte(), 6, 0, 31,  // Load $6 with 32: the start of the iteration
+                Opcode::Set.byte(), 6, 31, 0,  // Load $6 with 29: the start of the iteration
 
                 // Start of fib iterations
                 Opcode::Equal.byte(), 1, 2,     // Check if $1 (current) and $2 (max) are equal
                 Opcode::JumpIfEqual.byte(), 0,  // Jump to byte $0 if equal flag is set
 
                 Opcode::Increment.byte(), 1,    // Increment $1
-                Opcode::Add.byte(), 3, 4, 5,    // $3 + $4 = $5
-                Opcode::Move.byte(), 4, 3,      // $3 = $4
-                Opcode::Move.byte(), 5, 4,      // $4 = $5
+                Opcode::Add.byte(), 5, 3, 4,    // $5 = $3 + $4
+                Opcode::Move.byte(), 3, 4,      // $3 = $4
+                Opcode::Move.byte(), 4, 5,      // $4 = $5
                 
                 Opcode::Jump.byte(), 6,         // Jump to byte $6
             ];
@@ -164,7 +188,7 @@ mod tests {
 
             // Verify that our register has reached MAX_ITERATIONS
             assert_eq!(test_vm.registers[1], test_vm.registers[2]);
-            assert_eq!(test_vm.registers[4], 1134903170);
+            assert_eq!(test_vm.registers[4], target);
         }
 
         println!("Bytecode took: {:.2?}ns", (totals.iter().sum::<u128>() / totals.len() as u128));
