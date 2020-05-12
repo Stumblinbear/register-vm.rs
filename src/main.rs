@@ -9,7 +9,7 @@ use crate::vm::instructions::Opcode;
 
 const COMMAND_PREFIX: char = '.';
 
-pub static BANNER: &str = "This is a thing. Type stuff. Yay.";
+pub static BANNER: &str = "Rust Register-based Virtual Machine v1. Type .help for a list of codes; .quit to exit.";
 pub static PROMPT: &str = ">>> ";
 
 fn main() {
