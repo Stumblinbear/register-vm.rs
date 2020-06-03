@@ -1,6 +1,6 @@
 # register-vm.rs
 
-This is just a toy bytecode virtual machine utilizing a register-based (rather than stack-based) written in Rust.
+This is just a toy bytecode virtual machine utilizing a register-based (rather than stack-based) architecture, written in Rust.
 
 ## Installation
 
